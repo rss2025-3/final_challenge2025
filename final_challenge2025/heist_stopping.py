@@ -5,7 +5,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker
 from rcl_interfaces.msg import SetParametersResult
-from stop_msgs.msg import PhysicalLocation
+#from stop_msgs.msg import PhysicalLocation
 from vs_msgs.msg import ConeLocation, ConeLocationPixel
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
