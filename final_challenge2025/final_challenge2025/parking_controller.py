@@ -27,7 +27,7 @@ class ParkingController(Node):
         self.create_subscription(ConeLocation, "/relative_stoplight", self.relative_stoplight_callback, 10)
         self.create_subscription(ConeLocation, "/relative_banana", self.relative_banana_callback, 10)
         self.create_subscription(Bool, "/stoplight_detected", self.stoplight_detected_callback, 10)
-        self.create_subscription(Bool, "/banana_detected", self.banana_detected_callback, 10)
+        self.create_subscription(Bool, "/banana_close", self.banana_detected_callback, 10)
 
 
         self.parking_distance = 0.05 # meters; try playing with this number!
