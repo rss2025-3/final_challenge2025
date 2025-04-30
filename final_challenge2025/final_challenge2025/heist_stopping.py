@@ -24,13 +24,15 @@ class HeistStoppingController(Node):
         self.declare_parameter("drive_topic", "default")
         self.declare_parameter("safety_topic", "default")
         self.declare_parameter("stopping_time", 0.0)
-
+        self.declare_parameter('odom_topic', "default")
 
         # Fetch constants from the ROS parameter server
         self.SCAN_TOPIC = self.get_parameter('scan_topic').get_parameter_value().string_value
         self.DRIVE_TOPIC = self.get_parameter('drive_topic').get_parameter_value().string_value
         self.SAFETY_TOPIC = self.get_parameter('safety_topic').get_parameter_value().string_value
         self.STOPPING_TIME = self.get_parameter('stopping_time').get_parameter_value().double_value
+        self.ODOM_TOPIC = self.get_parameter('odom_topic').get_parameter_value().string_value
+
 
         self.drive_publisher_ = self.create_publisher(AckermannDriveStamped, self.SAFETY_TOPIC, 10)
 
@@ -79,6 +81,17 @@ class HeistStoppingController(Node):
         #     self.ignore_bananas = False
         #     self.banana_cooldown = 30
         #     self.banana_stop_time = 30
+
+    def detect_stoplight(self, msg):
+        self.light_is_red = msg.data
+
+    def set_stoplight_loc(self, msg):
+        self.stoplight_loc = (msg.x, msg.y)
+        self.get_logger().info(f"Stoplight location received: {self.stoplight_loc}")
+
+    def set_banana_loc(self, msg):
+        self.banana_loc = (msg.x, msg.y)
+        self.get_logger().info(f"Banana location received: {self.banana_loc}")
 
     def listener_callback(self, laser_scan):
         

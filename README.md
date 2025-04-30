@@ -70,7 +70,7 @@ Here are the details of the challenge:
 Things to note: 
 * Any 2 points on the map can be chosen, so you should test your ability to navigate between any two points.
 
-<img src="media/Final Challenge City Driving Map.png" width="400"/>
+<img src="media/Final Challenge Shrinkray Heist Map.png" width="400"/>
 
 ### Scoring:
 
@@ -175,7 +175,7 @@ When grading the Technical approach and Experimental evaluation portions of your
 
 **For videos, we would like to see**:
 - Visualization of lane / marker tracking and stable drive control within a lane
-- Recovery of your car if it is outside of its assigned track lane
+- Recovery of your car if it begins to veer off 
 - Successful path-planning and obstacle avoidance through the course
 
 **For numerical evidence, we would like to see**:
