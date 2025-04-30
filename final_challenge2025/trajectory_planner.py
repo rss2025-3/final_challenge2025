@@ -3,7 +3,7 @@ from rclpy.node import Node
 import matplotlib.pyplot as plt
 from scipy.ndimage import binary_dilation
 from .a_star_final import a_star_final, plot_path
-from .rrt import RRT
+#from .rrt import RRT
 from std_msgs.msg import Bool
 from ackermann_msgs.msg import AckermannDriveStamped
 from nav_msgs.msg import Odometry
