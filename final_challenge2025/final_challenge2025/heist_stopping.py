@@ -6,6 +6,10 @@ from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker
 from rcl_interfaces.msg import SetParametersResult
 from stop_msgs.msg import PhysicalLocation
+from vs_msgs.msg import ConeLocation, ConeLocationPixel
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Bool
+from math import inf
 
 #from safety_controller.visualization_tools import VisualizationTools
 
@@ -42,10 +46,14 @@ class HeistStoppingController(Node):
             self.listener_callback,
             10)
 
-        self.detect_stoplight = self.create_subscription(Bool, '/detect_stoplight', self.at_stoplight, 10)
-        self.stoplights = self.create_subscription(PhysicalLocation, '/stoplight_loc', self.at_stoplight,10)
-        self.bananas = self.create_subscription(PhysicalLocation, '/banana_loc', self.at_banana,10)
-        self.guards = self.create_subscription(Bool, '/detect_guards', self.listener_callback,10)
+        self.ground_truth_subscriber = self.create_subscription(Odometry, '/pf/pose/odom', self.get_car_pose, 1)
+        self.stoplight_loc = (-12.4, 14.6)
+        self.stoplight_dist = float(inf)
+        self.stoplight_red = False
+        self.stoplight = self.create_subscription(ConeLocation, '/relative_stoplight', self.at_stoplight,10)
+        self.detect_stoplight = self.create_subscription(Bool, '/detect_stoplight', self.detect_stoplight,10)
+        # self.bananas = self.create_subscription(PhysicalLocation, '/banana_loc', self.at_banana,10)
+        # self.guards = self.create_subscription(Bool, '/detect_guards', self.listener_callback,10)
         
         # velocity that gets updated by listening to the drive command
         self.velocity = 1
@@ -53,15 +61,24 @@ class HeistStoppingController(Node):
         self.banana_cooldown = 30
         self.ignore_bananas = False
 
+    def detect_stoplight(self, msg):
+        self.stoplight_red = msg.data
+
+    def get_car_pose(self,msg):
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
+
+        self.stoplight_dist = np.sqrt((x-self.stoplight_loc[0])**2+(y-self.stoplight_loc[1])**2)
+
     def acker_callback(self, msg):
         self.velocity = msg.drive.speed
         
-        if self.ignore_bananas and self.banana_cooldown:
-            self.banana_cooldown -= 1
-        else: #reset
-            self.ignore_bananas = False
-            self.banana_cooldown = 30
-            self.banana_stop_time = 30
+        # if self.ignore_bananas and self.banana_cooldown:
+        #     self.banana_cooldown -= 1
+        # else: #reset
+        #     self.ignore_bananas = False
+        #     self.banana_cooldown = 30
+        #     self.banana_stop_time = 30
 
     def listener_callback(self, laser_scan):
         
@@ -90,46 +107,25 @@ class HeistStoppingController(Node):
             self.drive_publisher_.publish(drive_stamped)
 
     def at_stoplight(self, msg):
-        light_dist = np.sqrt(msg.x**2+msg.y**2)
-        vel = max(self.velocity, 0.01)
-        stopping_dist = (vel**2) / (2*1.4*9.8)
-        stop = light_dist < stopping_dist
+        if self.stoplight_dist < 2:
+            vel = max(self.velocity, 0.01)
+            stopping_dist = (vel**2) / (2*1.4*9.8)
+            stop = self.stoplight_dist-0.75 < stopping_dist
 
-        if stop and self.detect_stoplight:
-            current_time = self.get_clock().now()
-            drive_stamped = AckermannDriveStamped()
-            drive_stamped.header.frame_id = "drive_frame_id"
-            drive_stamped.header.stamp = current_time.to_msg()
-            drive_stamped.drive.speed = 0.0
-            drive_stamped.drive.steering_angle = 0.0
-            self.get_logger().info(f'{time_to_collision}, {forward_dist}')
-        
-            self.drive_publisher_.publish(drive_stamped)
-
-    def at_banana(self, msg):
-        banana_dist = np.sqrt(msg.x**2+msg.y**2)
-        vel = max(self.velocity, 0.01)
-        stopping_dist = (vel**2) / (2*1.4*9.8)
-        stop = banana_dist < stopping_dist
-
-        if stop and self.banana_stop_time:
-            current_time = self.get_clock().now()
-            drive_stamped = AckermannDriveStamped()
-            drive_stamped.header.frame_id = "drive_frame_id"
-            drive_stamped.header.stamp = current_time.to_msg()
-            drive_stamped.drive.speed = 0.0
-            drive_stamped.drive.steering_angle = 0.0
-            self.get_logger().info(f'{time_to_collision}, {forward_dist}')
-        
-            self.drive_publisher_.publish(drive_stamped)
-            self.banana_stop_time -= 1
-        elif stop and not self.banana_stop_time and self.banana_cooldown:
-            self.ignore_bananas = True # start cooldown
-
+            if stop and self.stoplight_red:
+                self.get_logger().info(f"Stopping at red light: distance={self.stoplight_dist:.2f}, velocity={self.velocity:.2f}")
+                current_time = self.get_clock().now()
+                drive_stamped = AckermannDriveStamped()
+                drive_stamped.header.frame_id = "drive_frame_id"
+                drive_stamped.header.stamp = current_time.to_msg()
+                drive_stamped.drive.speed = 0.0
+                drive_stamped.drive.steering_angle = 0.0
+            
+                self.drive_publisher_.publish(drive_stamped)
 
 def main():
     rclpy.init()
-    heist_safety_controller = HeistSafetyController()
+    heist_safety_controller = HeistStoppingController()
     rclpy.spin(heist_safety_controller)
     heist_safety_controller.destroy_node()
     rclpy.shutdown()
