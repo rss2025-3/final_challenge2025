@@ -22,6 +22,7 @@ class ParkingController(Node):
         DRIVE_TOPIC = self.get_parameter("drive_topic").value # set in launch file; different for simulator vs racecar
 
         self.drive_pub = self.create_publisher(AckermannDriveStamped, DRIVE_TOPIC, 10)
+        self.parked_pub = self.create_publisher(Bool, "/is_parked", 10)
         self.error_pub = self.create_publisher(ParkingError, "/parking_error", 10)
 
         self.create_subscription(ConeLocation, "/relative_stoplight", self.relative_stoplight_callback, 10)
@@ -70,6 +71,7 @@ class ParkingController(Node):
         drive_cmd = AckermannDriveStamped()
         drive_cmd.header.frame_id = "base_link"
         drive_cmd.header.stamp = current_time.to_msg()
+        parked_msg = Bool()
         
         error_dist = abs(self.relative_x)-self.parking_distance
         if self.backwards is False:
@@ -77,25 +79,32 @@ class ParkingController(Node):
                 # we're parked
                 drive_cmd.drive.speed = 0.0
                 drive_cmd.drive.steering_angle = 0.0
+                parked_msg.data = True 
+
             elif self.relative_x < self.parking_distance:
                 # we're too close
                 drive_cmd.drive.speed = -1 * self.speed
                 drive_cmd.drive.steering_angle = 0.0
                 self.backwards = True
+                parked_msg.data = False
+                
             else:
                 drive_cmd.drive.speed = 1 * self.speed
                 drive_cmd.drive.steering_angle = delta
+                parked_msg.data = False
         else:
             if self.relative_x > self.parking_distance:
                 drive_cmd.drive.speed = 1 * self.speed
                 drive_cmd.drive.steering_angle = delta
                 self.backwards = False
+                parked_msg.data = False
             else:
                 drive_cmd.drive.speed = -1 * self.speed
                 drive_cmd.drive.steering_angle = 0.0
+                parked_msg.data = False
 
 
-
+        self.parked_pub.publish(parked_msg)
         self.drive_pub.publish(drive_cmd)
         self.error_publisher()
 
