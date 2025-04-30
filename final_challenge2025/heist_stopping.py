@@ -5,7 +5,6 @@ from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker
 from rcl_interfaces.msg import SetParametersResult
-from stop_msgs.msg import PhysicalLocation
 from vs_msgs.msg import ConeLocation, ConeLocationPixel
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
@@ -44,7 +43,7 @@ class HeistStoppingController(Node):
         
         self.lidar_subscription = self.create_subscription(
             LaserScan,
-            self.SCAN_TOPIC,
+            "/scan",
             self.listener_callback,
             10)
 
