@@ -57,6 +57,7 @@ class PathPlan(Node):
             10
         )
 
+        self.goals_clicked = 0
         self.curr_pos = None
         self.state = None
         self.goal_index = 0
@@ -141,20 +142,28 @@ class PathPlan(Node):
         return pixel_x, pixel_y
 
     def pose_cb(self, pose):
+        self.get_logger().info("in pose_cb")
         clicked_x = pose.pose.pose.position.x
         clicked_y = pose.pose.pose.position.y
 
         self.current_position = (clicked_x, clicked_y)
 
     def goal_cb(self, msg):
-        self.goals = []
-        for point in msg.poses:
-            goal = (point.pose.position.x, point.pose.position.y)
-            self.goals.append(goal)
+        self.get_logger().info("in goal_cb")
+        goal = (msg.pose.position.x, msg.pose.position.y)
+        self.get_logger().info(f"Received goal: {goal}")
+        self.goals.append(goal)
+        self.goals_clicked += 1
 
-        return_loc = (self.curr_pos.pose.position.x, self.curr_pos.pose.position.y)
-        self.goals.append(return_loc)
-        self.state = "START"
+        # self.goals = []
+        # for point in msg.poses:
+        #     goal = (point.pose.position.x, point.pose.position.y)
+        #     self.goals.append(goal)
+
+        if self.goals_clicked == 2:
+            return_loc = (self.curr_pos.pose.pose.position.x, self.curr_pos.pose.pose.position.y)
+            self.goals.append(return_loc)
+            self.state = "START"
         # self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
 
     def plan_path(self, start_point, end_point, map, a_star=True):
