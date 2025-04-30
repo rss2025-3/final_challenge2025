@@ -1,6 +1,6 @@
 <launch>
   <!-- Launch the wall follower with parameters -->
   <node pkg="final_challenge2025" name="heist_stopping" exec="heist_stopping" output="screen">
-    <param from="$(find-pkg-share final_challenge2025)/heist_params.yaml"/>
+    <param from="$(find-pkg-share final_challenge2025)/config/stop_params.yaml"/>
   </node>
 </launch>

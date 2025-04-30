@@ -1,0 +1,6 @@
+heist_stopping:
+  ros__parameters:
+    scan_topic: "/scan"
+    drive_topic: "/vesc/low_level/ackermann_cmd" # TODO: change to "/vesc/low_level/ackermann_cmd" for real car, topic for reading drive command
+    safety_topic: "/vesc/low_level/input/safety" # topic to publish drive command
+    stopping_time: 0.4 # TODO: change this to match reasonable real life values
