@@ -308,7 +308,7 @@ class PathPlan(Node):
                 #             self.get_logger().info("5 seconds parked. Moving to next.")
                 #             self.park_start_time = None
                 #             self.goal_index += 1
-                #             if self.goal_index < len(self.goals):
+                #             if self.goal_index < 2:
                 #                 self.state = "PLANNING"
                 #             else:
                 #                 self.state = "DONE"
