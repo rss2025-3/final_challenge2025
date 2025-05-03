@@ -76,7 +76,7 @@ class PurePursuit(Node):
 
 
                 eta = math.atan2((lookahead_point[1] - map_y),  (lookahead_point[0] - map_x)) - theta
-                self.get_logger().info(f"lookahead1:{(lookahead_point[1] - map_y)}, 2: {(lookahead_point[0] - map_x)}")
+                # self.get_logger().info(f"lookahead1:{(lookahead_point[1] - map_y)}, 2: {(lookahead_point[0] - map_x)}")
                 delta = math.atan2(2 * self.wheelbase_length * math.sin(eta),  self.lookahead)
                 #self.get_logger().info(f'{eta=}')
                 current_time = self.get_clock().now()
@@ -209,7 +209,7 @@ class PurePursuit(Node):
 
     def trajectory_callback(self, msg):
         self.get_logger().info(f"Receiving new trajectory {len(msg.poses)} points")
-        self.get_logger().info(f"Receiving new trajectory {msg.poses} points")
+        # self.get_logger().info(f"Receiving new trajectory {msg.poses} points")
 
         self.trajectory.clear()
         self.trajectory.fromPoseArray(msg)

@@ -74,7 +74,12 @@ class PathPlan(Node):
         self.viz_timer = self.create_timer(1/5, self.state_machine_cb)
 
     def localize_cb(self, msg):
-        self.curr_pos = msg 
+        self.curr_pos = msg
+
+        self.current_position = (
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y
+        ) 
 
     def check_parked(self,msg):
         self.parked = msg.data
@@ -151,16 +156,25 @@ class PathPlan(Node):
     def goal_cb(self, msg):
         self.get_logger().info("in goal_cb")
         goal = (msg.pose.position.x, msg.pose.position.y)
-        self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
-        # self.get_logger().info(f"Received goal: {goal}")
-        # self.goals.append(goal)
-        # self.goals_clicked += 1
+        # self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
+        self.get_logger().info(f"Received goal: {goal}")
+        self.goals.append(goal)
+        self.goals_clicked += 1
 
-        # if self.goals_clicked == 2:
-        #     self.get_logger().info(f"cur pose: {self.curr_pos}")
-        #     return_loc = (self.curr_pos.pose.pose.position.x, self.curr_pos.pose.pose.position.y)
-        #     self.goals.append(return_loc)
-        #     self.state = "START"
+        if self.goals_clicked == 2:
+            self.get_logger().info(f"cur pose: {self.curr_pos}")
+            tempx = self.curr_pos.pose.pose.position.x
+            tempy = self.curr_pos.pose.pose.position.y
+            return_loc = (tempx, tempy)
+
+            self.return_to_start_goal = return_loc  
+            self.goals.append(return_loc)
+
+            # tempx = self.curr_pos.pose.pose.position.x
+            # tempy = self.curr_pos.pose.pose.position.y
+            # return_loc = (tempx, tempy)
+            # self.goals.append(return_loc)
+            self.state = "START"
 
     def plan_path(self, start_point, end_point, map, a_star=True):
         start_time = self.get_clock().now()
@@ -259,6 +273,7 @@ class PathPlan(Node):
 
     def state_machine_cb(self):
         if self.goals:
+            self.get_logger().info(f"goals: {self.goals}")
             if self.state == "START":
                 self.get_logger().info("switch to planning")
                 self.state = "PLANNING"
@@ -270,39 +285,37 @@ class PathPlan(Node):
             elif self.state == "DRIVING":
                 goal = self.goals[self.goal_index]
                 dist = np.linalg.norm(np.array(goal) - np.array(self.current_position))
-
-                if dist < 0.5:
+                self.get_logger().info(f"dist: {dist}")
+                if dist < 1:
                     self.state = "DETECTING"
                     self.start_time = self.get_clock().now()
                     self.get_logger().info("switch to detecting")
             elif self.state == "DETECTING":
-                self.banana_close.publish(Bool(data=True))
-                if self.parked:
-                    if self.park_start_time is None:
-                        self.park_start_time = self.get_clock().now()
-                    else:
-                        time_parked = (self.get_clock().now() - self.park_start_time).nanoseconds / 1e9
-                        if time_parked >= 5.0:  # 5 second wait
-                            self.get_logger().info("5 seconds parked. Moving to next.")
-                            self.park_start_time = None
-                            self.goal_index += 1
-                            if self.goal_index < len(self.goals):
-                                self.state = "PLANNING"
-                            else:
-                                self.state = "DONE"
-                                self.get_logger().info("All goals visited. Returning to start.")
-
-                # self.banana_detected = True
-                # if self.banana_detected:
-                #     self.goal_index += 1
-                #     if self.goal_index < len(self.goals):
-                #         self.get_logger().info("switch to planning for next point")
-                #         self.state = "PLANNING"
+                self.goal_index += 1
+                self.get_logger().info(f"{self.goal_index}")
+                if self.goal_index < 2:
+                    self.state = "PLANNING"
+                else:
+                    self.state = "DONE"
+                    self.get_logger().info("All goals visited. Returning to start.")
+                # self.banana_close.publish(Bool(data=True))
+                # if self.parked:
+                #     if self.park_start_time is None:
+                #         self.park_start_time = self.get_clock().now()
                 #     else:
-                #         self.state = "DONE"
-                #         self.goals = []
+                #         time_parked = (self.get_clock().now() - self.park_start_time).nanoseconds / 1e9
+                #         if time_parked >= 5.0:  # 5 second wait
+                #             self.get_logger().info("5 seconds parked. Moving to next.")
+                #             self.park_start_time = None
+                #             self.goal_index += 1
+                #             if self.goal_index < len(self.goals):
+                #                 self.state = "PLANNING"
+                #             else:
+                #                 self.state = "DONE"
+                #                 self.get_logger().info("All goals visited. Returning to start.")
             elif self.state == "DONE":
                 goal = self.goals[self.goal_index]
+                self.get_logger().info(f"start goal: {goal}")
                 self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
                 self.goals_clicked = 0
                 self.get_logger().info("going back to start")
