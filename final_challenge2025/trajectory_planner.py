@@ -151,20 +151,16 @@ class PathPlan(Node):
     def goal_cb(self, msg):
         self.get_logger().info("in goal_cb")
         goal = (msg.pose.position.x, msg.pose.position.y)
-        self.get_logger().info(f"Received goal: {goal}")
-        self.goals.append(goal)
-        self.goals_clicked += 1
+        self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
+        # self.get_logger().info(f"Received goal: {goal}")
+        # self.goals.append(goal)
+        # self.goals_clicked += 1
 
-        # self.goals = []
-        # for point in msg.poses:
-        #     goal = (point.pose.position.x, point.pose.position.y)
-        #     self.goals.append(goal)
-
-        if self.goals_clicked == 2:
-            return_loc = (self.curr_pos.pose.pose.position.x, self.curr_pos.pose.pose.position.y)
-            self.goals.append(return_loc)
-            self.state = "START"
-        # self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
+        # if self.goals_clicked == 2:
+        #     self.get_logger().info(f"cur pose: {self.curr_pos}")
+        #     return_loc = (self.curr_pos.pose.pose.position.x, self.curr_pos.pose.pose.position.y)
+        #     self.goals.append(return_loc)
+        #     self.state = "START"
 
     def plan_path(self, start_point, end_point, map, a_star=True):
         start_time = self.get_clock().now()
@@ -179,6 +175,7 @@ class PathPlan(Node):
                 self.get_logger().info(f"Path found! (from A*): {path}")
                 for point in path:
                     point = self.pixel_to_map(*point)
+                    
                     self.trajectory.addPoint((float(point[0]),float(point[1])))
             else:
                 self.get_logger().info("No path found (from A*)")
@@ -307,6 +304,7 @@ class PathPlan(Node):
             elif self.state == "DONE":
                 goal = self.goals[self.goal_index]
                 self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
+                self.goals_clicked = 0
                 self.get_logger().info("going back to start")
             else:
                 pass
