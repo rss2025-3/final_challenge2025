@@ -49,7 +49,7 @@ class StoplightDetector(Node):
         
         self.get_logger().info(f'Stoplight Detected Color: {detected_color}')
         
-        if detected_color = 'red':
+        if detected_color == 'red':
             bool_msg = Bool()
             bool_msg.data = True
             self.stop_pub.publish(bool_msg)

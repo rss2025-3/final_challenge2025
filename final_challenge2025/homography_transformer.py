@@ -87,7 +87,7 @@ class HomographyTransformer(Node):
 
         self.cone_pub.publish(relative_xy_msg)
 
-        def stoplight_detection_callback(self, msg):
+    def stoplight_detection_callback(self, msg):
         x, y = self.transform_uv_to_xy(msg.u, msg.v)
         relative_msg = ConeLocation()
         relative_msg.x_pos = x
