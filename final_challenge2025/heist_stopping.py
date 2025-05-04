@@ -53,7 +53,7 @@ class HeistStoppingController(Node):
         self.stoplight_red = False
         self.stoplight = self.create_subscription(ConeLocation, '/relative_stoplight', self.at_stoplight,10)
         self.detect_stoplight = self.create_subscription(Bool, '/detect_stoplight', self.detect_stoplight,10)
-        # self.bananas = self.create_subscription(PhysicalLocation, '/banana_loc', self.at_banana,10)
+        self.bananas = self.create_subscription(PhysicalLocation, '/banana_loc', self.at_banana,10)
         # self.guards = self.create_subscription(Bool, '/detect_guards', self.listener_callback,10)
         
         # velocity that gets updated by listening to the drive command
@@ -100,7 +100,7 @@ class HeistStoppingController(Node):
         # index 50 is the front middle and so 45:55 is the region around it
         forward_dist = min(scan_data[480:600]) # TODO: check the dimensions of actual LIDAR scan
         time_to_collision = forward_dist / (self.velocity+0.01)
-        stop = time_to_collision < self.STOPPING_TIME or forward_dist < 0.3
+        stop = time_to_collision < (self.STOPPING_TIME+0.4) or forward_dist < 0.3
         
         
         if stop: # TODO: if this doesn't work maybe we also check distance

@@ -96,7 +96,7 @@ class PathPlan(Node):
             self.get_logger().info("Precomputed binary occupancy grid loaded.")
         except:
             # Invert and dilate the binary occupancy grid
-            self.dilated_occupancy_grid = binary_dilation(self.binary_occupancy_grid, iterations=10)
+            self.dilated_occupancy_grid = binary_dilation(self.binary_occupancy_grid, iterations=2)
             self.dilated_occupancy_grid = ~self.dilated_occupancy_grid 
             #np.save(self.dilated_occupancy_grid)
             
@@ -183,7 +183,7 @@ class PathPlan(Node):
             start_px = self.map_to_pixel(*start_point)  # (x, y) in meters → pixels
             goal_px = self.map_to_pixel(*end_point)
             self.get_logger().info(f"Start: {start_point}, End: {end_point}")
-            path = a_star_final(map, start_px, goal_px, block_size=5)
+            path = a_star_final(map, start_px, goal_px, block_size=2)
             if path != None:
                 path = [(float(x), float(y)) for x, y in path]
                 self.get_logger().info(f"Path found! (from A*): {path}")
@@ -252,6 +252,33 @@ class PathPlan(Node):
 
         # plot_path(~map.T, path, start_px, goal_px, filename='path_plot.png', path2=path2)
 
+    def plan_path_midpoint(self, start_point, mid_point, end_point, map, a_star=True):
+        start_time = self.get_clock().now()
+        if a_star:
+            self.trajectory.clear()
+            start_px = self.map_to_pixel(*start_point)  # (x, y) in meters → pixels
+            midpoint_px = self.map_to_pixel(*mid_point)
+            goal_px = self.map_to_pixel(*end_point)
+            self.get_logger().info(f"Start: {start_point}, End: {end_point}")
+            path1 = a_star_final(map, start_px, midpoint_px, block_size=2)
+            path2 = a_star_final(map, midpoint_px, goal_px, block_size=2)
+            if path1 != None and path2 != None:
+                path1.extend(path2[1:])
+                path = [(float(x), float(y)) for x, y in path1]
+                self.get_logger().info(f"Path found! (from A*): {path}")
+                for point in path:
+                    point = self.pixel_to_map(*point)
+
+                    self.trajectory.addPoint((float(point[0]),float(point[1])))
+            else:
+                self.get_logger().info("No path found (from A*)")
+
+        end_time = self.get_clock().now()
+        runtime = (end_time - start_time).nanoseconds / 1e9  # Convert to seconds
+        self.get_logger().info(f"A* Runtime: {runtime} seconds")
+
+        self.traj_pub.publish(self.trajectory.toPoseArray())
+        self.trajectory.publish_viz()
 
     def save_grid_image(self, filename="src/path_planning/binary_occupancy_grid.png", dpi=1000):
         np.save("src/path_planning/binary_occupancy_grid.npy", self.binary_occupancy_grid)
@@ -272,6 +299,7 @@ class PathPlan(Node):
         self.get_logger().info(f"Binary occupancy grid saved as {filename} with DPI {dpi}")
 
     def state_machine_cb(self):
+        self.get_logger().info(self.state)
         if self.goals:
             self.get_logger().info(f"goals: {self.goals}")
             if self.state == "START":
@@ -293,32 +321,36 @@ class PathPlan(Node):
             elif self.state == "DETECTING":
                 self.goal_index += 1
                 self.get_logger().info(f"{self.goal_index}")
-                if self.goal_index < 2:
-                    self.state = "PLANNING"
-                else:
-                    self.state = "DONE"
-                    self.get_logger().info("All goals visited. Returning to start.")
+                # if self.goal_index < 2:
+                #     self.state = "PLANNING"
+                # else:
+                #     self.state = "DONE"
+                #     self.get_logger().info("All goals visited. Returning to start.")
                 # self.banana_close.publish(Bool(data=True))
-                # if self.parked:
-                #     if self.park_start_time is None:
-                #         self.park_start_time = self.get_clock().now()
-                #     else:
-                #         time_parked = (self.get_clock().now() - self.park_start_time).nanoseconds / 1e9
-                #         if time_parked >= 5.0:  # 5 second wait
-                #             self.get_logger().info("5 seconds parked. Moving to next.")
-                #             self.park_start_time = None
-                #             self.goal_index += 1
-                #             if self.goal_index < 2:
-                #                 self.state = "PLANNING"
-                #             else:
-                #                 self.state = "DONE"
-                #                 self.get_logger().info("All goals visited. Returning to start.")
+                if self.parked:
+                    if self.park_start_time is None:
+                        self.park_start_time = self.get_clock().now()
+                    else:
+                        time_parked = (self.get_clock().now() - self.park_start_time).nanoseconds / 1e9
+                        if time_parked >= 5.0:  # 5 second wait
+                            self.get_logger().info("5 seconds parked. Moving to next.")
+                            self.park_start_time = None
+                            self.goal_index += 1
+                            if self.goal_index < 2:
+                                self.state = "PLANNING"
+                            else:
+                                self.state = "DONE"
+                                self.get_logger().info("All goals visited. Returning to start.")
             elif self.state == "DONE":
+                self.state == "FINISHED"
                 goal = self.goals[self.goal_index]
                 self.get_logger().info(f"start goal: {goal}")
-                self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
+                midpoint = (-54.54682159423828, 26.789297103881836)
+                self.plan_path_midpoint(self.current_position, midpoint, goal, self.dilated_occupancy_grid, a_star=True)
                 self.goals_clicked = 0
                 self.get_logger().info("going back to start")
+            elif self.state == "FINISHED":
+                return
             else:
                 pass
 

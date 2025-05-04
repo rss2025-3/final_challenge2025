@@ -20,7 +20,7 @@ class PurePursuit(Node):
         self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
         self.drive_topic = self.get_parameter('drive_topic').get_parameter_value().string_value
 
-        self.speed = 4.0  # FILL IN #
+        self.speed = 1.0  # FILL IN #
         #self.lookahead = 2.0 * self.speed  # FILL IN #
         self.lookahead = 2.0
         self.wheelbase_length = 0.33  # FILL IN #
@@ -74,7 +74,6 @@ class PurePursuit(Node):
                 # Publish the point
                 self.point_pub.publish(point_msg)
 
-
                 eta = math.atan2((lookahead_point[1] - map_y),  (lookahead_point[0] - map_x)) - theta
                 # self.get_logger().info(f"lookahead1:{(lookahead_point[1] - map_y)}, 2: {(lookahead_point[0] - map_x)}")
                 delta = math.atan2(2 * self.wheelbase_length * math.sin(eta),  self.lookahead)
@@ -87,7 +86,8 @@ class PurePursuit(Node):
                 last_pt = np.array(self.trajectory.points[-1])
                 car_pos = np.array([map_x, map_y])
                 dist_to_goal = np.linalg.norm(last_pt - car_pos)
-
+                
+                # backwards hack
                 drive_cmd.drive.speed = 1 * self.speed
 
                 if dist_to_goal <= 1:
