@@ -26,7 +26,7 @@ class PathPlan(Node):
         self.declare_parameter('odom_topic', "default")
         self.declare_parameter('map_topic', "default")
         self.declare_parameter('initial_pose_topic', "default")
-        self.declare_parameter("drive_topic")
+        self.declare_parameter("drive_topic", "default")
 
         self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
         self.map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
@@ -100,7 +100,7 @@ class PathPlan(Node):
             self.get_logger().info("Precomputed binary occupancy grid loaded.")
         except:
             # Invert and dilate the binary occupancy grid
-            self.dilated_occupancy_grid = binary_dilation(self.binary_occupancy_grid, iterations=2)
+            self.dilated_occupancy_grid = binary_dilation(self.binary_occupancy_grid, iterations=5)
             self.dilated_occupancy_grid = ~self.dilated_occupancy_grid 
             #np.save(self.dilated_occupancy_grid)
             

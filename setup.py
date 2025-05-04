@@ -35,7 +35,6 @@ setup(
             "basement_point_publisher = final_challenge2025.basement_point_publisher:main",
             "trajectory_follower = final_challenge2025.trajectory_follower:main",
             "a_star_final = final_challenge2025.a_star_final:main",
-            "color_segmentation = final_challenge2025.color_segmentation:main",
             "heist_stopping = final_challenge2025.heist_stopping:main",
             "detection_node = final_challenge2025.model.detection_node:main",
             "parking_controller = final_challenge2025.parking_controller:main"
