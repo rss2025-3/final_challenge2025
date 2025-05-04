@@ -49,10 +49,10 @@ class ParkingController(Node):
     def banana_detected_callback(self, msg):
         self.banana_detected = msg.data
 
-    def relative_stoplight_callback(self, msg):
-        if self.stoplight_detected:
-            self.execute_parking(msg.x, msg.y + 0.06)  # adjust y if needed
-            self.get_logger().info("Parking toward STOPLIGHT")
+    # def relative_stoplight_callback(self, msg):
+    #     if self.stoplight_detected:
+    #         self.execute_parking(msg.x, msg.y + 0.06)  # adjust y if needed
+    #         self.get_logger().info("Parking toward STOPLIGHT")
 
     def relative_banana_callback(self, msg):
         if self.banana_detected:

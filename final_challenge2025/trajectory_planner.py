@@ -26,10 +26,13 @@ class PathPlan(Node):
         self.declare_parameter('odom_topic', "default")
         self.declare_parameter('map_topic', "default")
         self.declare_parameter('initial_pose_topic', "default")
+        self.declare_parameter("drive_topic")
 
         self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
         self.map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
         self.initial_pose_topic = self.get_parameter('initial_pose_topic').get_parameter_value().string_value
+        self.DRIVE_TOPIC = self.get_parameter("drive_topic").value # set in launch file; different for simulator vs racecar
+        self.drive_pub = self.create_publisher(AckermannDriveStamped, self.DRIVE_TOPIC, 10)
 
         self.map_sub = self.create_subscription(
             OccupancyGrid,
@@ -65,6 +68,7 @@ class PathPlan(Node):
         self.park_start_time = None
         self.banana_detected = False
         self.parked = False
+        self.backup_start_time = None
 
         self.banana_close = self.create_publisher(Bool, "/banana_close", 10)
         self.is_parked = self.create_subscription(Bool, "/is_parked",self.check_parked,10)
@@ -332,15 +336,39 @@ class PathPlan(Node):
                         self.park_start_time = self.get_clock().now()
                     else:
                         time_parked = (self.get_clock().now() - self.park_start_time).nanoseconds / 1e9
-                        if time_parked >= 5.0:  # 5 second wait
-                            self.get_logger().info("5 seconds parked. Moving to next.")
+                        if time_parked >= 5.0:  # wait 5 seconds
+                            self.get_logger().info("5 seconds parked. Starting to back up.")
                             self.park_start_time = None
-                            self.goal_index += 1
-                            if self.goal_index < 2:
-                                self.state = "PLANNING"
-                            else:
-                                self.state = "DONE"
-                                self.get_logger().info("All goals visited. Returning to start.")
+                            self.backup_start_time = self.get_clock().now()
+                            self.state = "BACKING_UP"
+
+            elif self.state == "BACKING_UP":
+                if self.backup_start_time is None:
+                    self.backup_start_time = self.get_clock().now()
+
+                time_backing = (self.get_clock().now() - self.backup_start_time).nanoseconds / 1e9
+                backup_speed = -1.0  # m/s, adjust as needed
+                target_distance = 1.0  # meters
+
+                if time_backing < target_distance / abs(backup_speed):
+                    drive_msg = AckermannDriveStamped()
+                    drive_msg.drive.speed = backup_speed
+                    drive_msg.drive.steering_angle = 0.0
+                    self.drive_pub.publish(drive_msg)
+                else:
+                    # Stop the car after backing up
+                    stop_msg = AckermannDriveStamped()
+                    stop_msg.drive.speed = 0.0
+                    stop_msg.drive.steering_angle = 0.0
+                    self.drive_pub.publish(stop_msg)
+
+                    self.backup_start_time = None
+                    if self.goal_index < 2:
+                        self.state = "PLANNING"
+                        self.get_logger().info("Finished backing up. Planning next goal.")
+                    else:
+                        self.state = "DONE"
+                        self.get_logger().info("All goals visited. Returning to start.")
             elif self.state == "DONE":
                 self.state == "FINISHED"
                 goal = self.goals[self.goal_index]
