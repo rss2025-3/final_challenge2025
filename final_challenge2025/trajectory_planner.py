@@ -361,8 +361,8 @@ class PathPlan(Node):
         
         polygon2_coords = np.array([
             [844, 450],
-            [871, 450],
-            [871, 410],
+            [900, 445],
+            [900, 410],
             [844, 410] 
         ])
 
@@ -379,12 +379,20 @@ class PathPlan(Node):
             [1597, 647],  # Bottom right
             [1545, 647]   # Bottom left
         ])
+
+        polygon5_coords = np.array([
+            [655, 485],  # Top left
+            [675, 485],  # Top right
+            [675, 465],  # Bottom right
+            [655, 465]   # Bottom left
+        ])
         
         img = np.zeros(dilated_grid.shape, dtype=np.uint8)
         cv2.fillPoly(img, [polygon1_coords], 1)
         cv2.fillPoly(img, [polygon2_coords], 1)
         cv2.fillPoly(img, [polygon3_coords], 1)
         cv2.fillPoly(img, [polygon4_coords], 1)
+        cv2.fillPoly(img, [polygon5_coords], 1)
         masked_grid[img == 1] = 1
         
         return masked_grid
