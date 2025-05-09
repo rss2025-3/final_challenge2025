@@ -7,6 +7,7 @@ import numpy as np
 import math
 from .utils import LineTrajectory
 import tf_transformations as tf
+from std_msgs.msg import Bool
 
 class PurePursuit(Node):
     """ Implements Pure Pursuit trajectory tracking with a fixed lookahead and speed.
@@ -19,12 +20,12 @@ class PurePursuit(Node):
 
         self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
         self.drive_topic = self.get_parameter('drive_topic').get_parameter_value().string_value
-
+        self.drive_topic = "/vesc/high_level/input/nav_2"
         self.speed = 1.0  # FILL IN #
         #self.lookahead = 2.0 * self.speed  # FILL IN #
         self.lookahead = 2.0
         self.wheelbase_length = 0.33  # FILL IN #
-
+    
         self.trajectory = LineTrajectory("/followed_trajectory")
 
         self.traj_sub = self.create_subscription(PoseArray,
@@ -47,9 +48,18 @@ class PurePursuit(Node):
                                                1)
         
         self.initialized_traj = False
+        
+        self.banana_close = False
+        self.banana_sub = self.create_subscription(Bool, "/banana_close", self.banana_update, 10)
+        self.stoplight_loc = (-12.4, 14.6)
+        self.num_traj = 0
 
+    def banana_update(self, msg):
+        self.banana_close = msg.data
+        
     def pose_callback(self, odometry_msg):
-        if self.initialized_traj is True:
+        if self.initialized_traj is True and self.banana_close is False:
+            self.get_logger().info('PURE PURSUITTTTTT!!!')
             map_x = odometry_msg.pose.pose.position.x
             map_y = odometry_msg.pose.pose.position.y
             theta = tf.euler_from_quaternion((odometry_msg.pose.pose.orientation.x, odometry_msg.pose.pose.orientation.y, odometry_msg.pose.pose.orientation.z, odometry_msg.pose.pose.orientation.w))[2]
@@ -88,7 +98,13 @@ class PurePursuit(Node):
                 dist_to_goal = np.linalg.norm(last_pt - car_pos)
                 
                 # backwards hack
-                drive_cmd.drive.speed = 1 * self.speed
+                dist_to_stoplight = math.sqrt((map_x-self.stoplight_loc[0])**2 + (map_y-self.stoplight_loc[1])**2)
+                if self.num_traj == 3:
+                    drive_cmd.drive.speed = 2 * self.speed
+                elif dist_to_stoplight > 3:
+                    drive_cmd.drive.speed = 1 * self.speed
+                else:
+                    drive_cmd.drive.speed = 0.85 * self.speed
 
                 if dist_to_goal <= 1:
                     drive_cmd.drive.speed *= dist_to_goal
@@ -119,7 +135,15 @@ class PurePursuit(Node):
                 drive_cmd.drive.steering_angle = 0.0
                 self.drive_pub.publish(drive_cmd)
 
-   
+        else:
+            current_time = self.get_clock().now()
+            drive_cmd = AckermannDriveStamped()
+            drive_cmd.header.frame_id = "base_link"
+            drive_cmd.header.stamp = current_time.to_msg()
+            drive_cmd.drive.speed = 0.0
+
+            drive_cmd.drive.steering_angle = 0.0
+            self.drive_pub.publish(drive_cmd)
 
     def closest_point_vectorized(self, car_position):
         if len(self.trajectory.points) < 2:
@@ -216,7 +240,7 @@ class PurePursuit(Node):
         self.trajectory.publish_viz(duration=0.0)
 
         self.initialized_traj = True
-
+        self.num_traj += 1
 
 
 def main(args=None):

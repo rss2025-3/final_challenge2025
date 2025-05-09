@@ -39,9 +39,9 @@ class Detector:
         ((xmin, ymin, xmax, ymax), class_label) for each detection
         above the given confidence threshold.
         """
-        results = list(self.model(img, verbose=not silent))[0]
+        results = list(self.model(img, verbose=not silent, conf=self.threshold))[0]
         boxes = results.boxes
-
+        cv2.cvtColor(img, cv2.COLOR_BGR2RGB, img)
         predictions = []
         # Iterate over the bounding boxes
         for xyxy, conf, cls_idx in zip(boxes.xyxy, boxes.conf, boxes.cls):

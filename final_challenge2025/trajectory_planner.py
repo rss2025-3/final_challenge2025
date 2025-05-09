@@ -13,6 +13,7 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray
 from nav_msgs.msg import OccupancyGrid
 from .utils import LineTrajectory
 import tf_transformations as tf
+import cv2
 import numpy as np
 
 
@@ -31,8 +32,10 @@ class PathPlan(Node):
         self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
         self.map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
         self.initial_pose_topic = self.get_parameter('initial_pose_topic').get_parameter_value().string_value
-        self.DRIVE_TOPIC = self.get_parameter("drive_topic").value # set in launch file; different for simulator vs racecar
+        #self.DRIVE_TOPIC = self.get_parameter("drive_topic").value # set in launch file; different for simulator vs racecar
+        self.DRIVE_TOPIC = '/vesc/high_level/input/nav_0'
         self.drive_pub = self.create_publisher(AckermannDriveStamped, self.DRIVE_TOPIC, 10)
+        
 
         self.map_sub = self.create_subscription(
             OccupancyGrid,
@@ -69,7 +72,8 @@ class PathPlan(Node):
         self.banana_detected = False
         self.parked = False
         self.backup_start_time = None
-
+        self.going_banana3 = False
+        
         self.banana_close = self.create_publisher(Bool, "/banana_close", 10)
         self.is_parked = self.create_subscription(Bool, "/is_parked",self.check_parked,10)
         self.localize = self.create_subscription(Odometry, "/pf/pose/odom",self.localize_cb,10)
@@ -88,6 +92,30 @@ class PathPlan(Node):
     def check_parked(self,msg):
         self.parked = msg.data
 
+    def dilate_asymmetrically(self, occ_grid):
+        # Ensure occ_grid is a binary array: obstacles = True, free = False
+        occ_grid = occ_grid.astype(bool)
+        h, w = occ_grid.shape
+
+        # Masks for left and right halves
+        left_mask = np.zeros_like(occ_grid, dtype=bool)
+        right_mask = np.zeros_like(occ_grid, dtype=bool)
+        left_mask[:, :w // 2 + 100] = True
+        right_mask[:, w // 2 + 100:] = True
+
+        # Apply binary dilation with different structuring elements
+        left_dilated = binary_dilation(occ_grid, iterations=4) # structure=np.ones((5, 5)))
+        right_dilated = binary_dilation(occ_grid, iterations=15)# structure=np.ones((20, 20)))
+
+        # Combine based on masks
+        combined = np.where(left_mask, left_dilated, right_dilated)
+
+        img = combined.astype(np.uint8) * 255
+        cv2.imwrite("custom_dilate.png", img)
+
+
+        return combined.astype(np.uint8)
+    
     def map_cb(self, map_msg):
         occupancy_data = np.array(map_msg.data)
         binary_occupancy_grid = np.where((occupancy_data >= 0) & (occupancy_data <= 50), 0, 1)
@@ -100,7 +128,8 @@ class PathPlan(Node):
             self.get_logger().info("Precomputed binary occupancy grid loaded.")
         except:
             # Invert and dilate the binary occupancy grid
-            self.dilated_occupancy_grid = binary_dilation(self.binary_occupancy_grid, iterations=5)
+            #self.dilated_occupancy_grid = binary_dilation(self.binary_occupancy_grid, iterations=5)
+            self.dilated_occupancy_grid = self.dilate_asymmetrically(self.binary_occupancy_grid)
             self.dilated_occupancy_grid = ~self.dilated_occupancy_grid 
             #np.save(self.dilated_occupancy_grid)
             
@@ -166,9 +195,20 @@ class PathPlan(Node):
         self.goals_clicked += 1
 
         if self.goals_clicked == 2:
+            origin = np.array([1.34,-0.83])
+            dist1 = np.linalg.norm(origin-np.array(self.goals[0]))
+            dist2 = np.linalg.norm(origin-np.array(self.goals[1]))
+            if dist2 < dist1:
+                self.goals[0], self.goals[1] = self.goals[1], self.goals[0]
+            
+            is3 = np.linalg.norm(np.array(self.goals[1])-np.array([-20.45,32.6]))
+            if is3 < 3:
+                self.going_banana3 = True
+
             self.get_logger().info(f"cur pose: {self.curr_pos}")
-            tempx = self.curr_pos.pose.pose.position.x
-            tempy = self.curr_pos.pose.pose.position.y
+            tempx, tempy = self.current_position
+            #tempx = self.curr_pos.pose.pose.position.x
+            #tempy = self.curr_pos.pose.pose.position.y
             return_loc = (tempx, tempy)
 
             self.return_to_start_goal = return_loc  
@@ -303,7 +343,7 @@ class PathPlan(Node):
         self.get_logger().info(f"Binary occupancy grid saved as {filename} with DPI {dpi}")
 
     def state_machine_cb(self):
-        self.get_logger().info(self.state)
+        self.get_logger().info(f'{self.state=}')
         if self.goals:
             self.get_logger().info(f"goals: {self.goals}")
             if self.state == "START":
@@ -314,24 +354,48 @@ class PathPlan(Node):
                 self.plan_path(self.current_position, goal, self.dilated_occupancy_grid, a_star=True)
                 self.get_logger().info("switch to driving")
                 self.state = "DRIVING"
+                self.banana_close.publish(Bool(data=False))
             elif self.state == "DRIVING":
+                #self.banana_close.publish(Bool(data=False))
                 goal = self.goals[self.goal_index]
                 dist = np.linalg.norm(np.array(goal) - np.array(self.current_position))
                 self.get_logger().info(f"dist: {dist}")
-                if dist < 1:
+                if self.going_banana3:
+                    start_detecting = 3
+                else:
+                    start_detecting = 1.5
+
+                if dist < start_detecting: # if we're close to the banana location turn on the camera stuff
                     self.state = "DETECTING"
                     self.start_time = self.get_clock().now()
                     self.get_logger().info("switch to detecting")
             elif self.state == "DETECTING":
-                self.goal_index += 1
-                self.get_logger().info(f"{self.goal_index}")
-                # if self.goal_index < 2:
-                #     self.state = "PLANNING"
-                # else:
-                #     self.state = "DONE"
-                #     self.get_logger().info("All goals visited. Returning to start.")
-                # self.banana_close.publish(Bool(data=True))
                 if self.parked:
+                    #self.banana_close.publish(Bool(data=False))
+                    self.banana_close.publish(Bool(data=True))
+                    if self.park_start_time is None:
+                        self.goal_index += 1
+                        self.get_logger().info(f"{self.goal_index}")
+                        self.park_start_time = self.get_clock().now()
+                    
+                    time_parked = (self.get_clock().now() - self.park_start_time).nanoseconds / 1e9
+                    if time_parked >= 5.0:
+                        self.get_logger().info("5 seconds parked. Starting to back up.")
+                        self.park_start_time = None
+                        self.backup_start_time = self.get_clock().now()
+                        self.state = "BACKING_UP"
+                    
+                    '''
+                    if self.goal_index < 2:
+                        self.state = "PLANNING"
+                    else:
+                        self.state = "DONE"
+                        self.get_logger().info("All goals visited. Returning to start.")
+                    '''
+                else:
+                    self.banana_close.publish(Bool(data=True))
+                # if self.parked:
+                    '''
                     if self.park_start_time is None:
                         self.park_start_time = self.get_clock().now()
                     else:
@@ -341,14 +405,15 @@ class PathPlan(Node):
                             self.park_start_time = None
                             self.backup_start_time = self.get_clock().now()
                             self.state = "BACKING_UP"
+                    '''
 
             elif self.state == "BACKING_UP":
                 if self.backup_start_time is None:
                     self.backup_start_time = self.get_clock().now()
 
                 time_backing = (self.get_clock().now() - self.backup_start_time).nanoseconds / 1e9
-                backup_speed = -1.0  # m/s, adjust as needed
-                target_distance = 1.0  # meters
+                backup_speed = -4.0  # m/s, adjust as needed
+                target_distance = 20.0  # meters
 
                 if time_backing < target_distance / abs(backup_speed):
                     drive_msg = AckermannDriveStamped()
@@ -361,7 +426,7 @@ class PathPlan(Node):
                     stop_msg.drive.speed = 0.0
                     stop_msg.drive.steering_angle = 0.0
                     self.drive_pub.publish(stop_msg)
-
+                    #self.banana_close.publish(Bool(data=False))
                     self.backup_start_time = None
                     if self.goal_index < 2:
                         self.state = "PLANNING"
@@ -375,6 +440,7 @@ class PathPlan(Node):
                 self.get_logger().info(f"start goal: {goal}")
                 midpoint = (-54.54682159423828, 26.789297103881836)
                 self.plan_path_midpoint(self.current_position, midpoint, goal, self.dilated_occupancy_grid, a_star=True)
+                self.banana_close.publish(Bool(data=False))
                 self.goals_clicked = 0
                 self.get_logger().info("going back to start")
             elif self.state == "FINISHED":

@@ -88,14 +88,15 @@ class HomographyTransformer(Node):
         self.cone_pub.publish(relative_xy_msg)
 
     def stoplight_detection_callback(self, msg):
-        x, y = self.transform_uv_to_xy(msg.u, msg.v)
+        x, y = self.transformUvToXy(msg.u, msg.v)
         relative_msg = ConeLocation()
         relative_msg.x_pos = x
         relative_msg.y_pos = y
         self.stoplight_pub.publish(relative_msg)
 
     def banana_detection_callback(self, msg):
-        x, y = self.transform_uv_to_xy(msg.u, msg.v)
+        self.get_logger().info('PUBLISHING BANANA LOCATION!!!!!')
+        x, y = self.transformUvToXy(msg.u, msg.v)
         relative_msg = ConeLocation()
         relative_msg.x_pos = x
         relative_msg.y_pos = y

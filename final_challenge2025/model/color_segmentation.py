@@ -21,17 +21,20 @@ def image_print(img):
 	cv2.imshow("image", img)
 	cv2.waitKey(200)
 	cv2.destroyAllWindows()
-def detect_traffic_light(img, min_area=2000):
+def detect_traffic_light(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
+    # Set min_area to 5% of image area
+    img_area = img.shape[0] * img.shape[1]
+    min_area = 0.002 * img_area
     # Tuned HSV ranges
-    lower_red1 = np.array([0, 45, 185])
+    lower_red1 = np.array([0, 45, 100])
     upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([160, 45, 140])
+    lower_red2 = np.array([160, 45, 100])
     upper_red2 = np.array([180, 255, 255])
-    lower_green = np.array([50, 40, 140])
-    upper_green = np.array([90, 255, 255])
-    lower_yellow = np.array([15, 45, 140])
+    lower_green = np.array([50, 40, 100])
+    upper_green = np.array([105, 255, 255])
+    lower_yellow = np.array([15, 45, 100])
     upper_yellow = np.array([35, 255, 255])
 
     # Masks

@@ -37,6 +37,7 @@ setup(
             "a_star_final = final_challenge2025.a_star_final:main",
             "heist_stopping = final_challenge2025.heist_stopping:main",
             "detection_node = final_challenge2025.model.detection_node:main",
+            "homography_transformer = final_challenge2025.homography_transformer:main",
             "parking_controller = final_challenge2025.parking_controller:main"
         ],
     },
