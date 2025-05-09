@@ -124,18 +124,19 @@ class PathPlan(Node):
 
         try:
             self.dilated_occupancy_grid = np.load("dilated_occupancy_grid.npy")
-
             self.get_logger().info("Precomputed binary occupancy grid loaded.")
         except:
             # Invert and dilate the binary occupancy grid
-            #self.dilated_occupancy_grid = binary_dilation(self.binary_occupancy_grid, iterations=5)
             self.dilated_occupancy_grid = self.dilate_asymmetrically(self.binary_occupancy_grid)
+            
+            # Apply shape masks after dilation
+            self.dilated_occupancy_grid = self.apply_shape_masks(self.dilated_occupancy_grid)
+
+
             self.dilated_occupancy_grid = ~self.dilated_occupancy_grid 
-            #np.save(self.dilated_occupancy_grid)
             
             np.save("dilated_occupancy_grid.npy", self.dilated_occupancy_grid)
-
-            self.get_logger().info("Binary occupancy grid created and dilated.")
+            self.get_logger().info("Binary occupancy grid created and dilated with shape masks.")
         
         # Save the grid as an image
         self.save_grid_image()
@@ -221,6 +222,7 @@ class PathPlan(Node):
             self.state = "START"
 
     def plan_path(self, start_point, end_point, map, a_star=True):
+        # Create custom shapes and combine with the map
         start_time = self.get_clock().now()
         if a_star:
             self.trajectory.clear()
@@ -324,23 +326,48 @@ class PathPlan(Node):
         self.traj_pub.publish(self.trajectory.toPoseArray())
         self.trajectory.publish_viz()
 
-    def save_grid_image(self, filename="src/path_planning/binary_occupancy_grid.png", dpi=1000):
-        np.save("src/path_planning/binary_occupancy_grid.npy", self.binary_occupancy_grid)
-        np.save("src/path_planning/dilated_occupancy_grid.npy", self.dilated_occupancy_grid)
+    def save_grid_image(self, dpi=1000):
+        # Get package path
+        pkg_name = "final_challenge2025/occupancy_grid_viz"
+        
+        # Save numpy arrays
+        np.save(f"src/{pkg_name}/binary_occupancy_grid.npy", self.binary_occupancy_grid)
+        np.save(f"src/{pkg_name}/dilated_occupancy_grid.npy", self.dilated_occupancy_grid)
 
         plt.imshow(self.binary_occupancy_grid, cmap='gray', origin='lower')
 
         masked_dilated_grid = np.ma.masked_where(self.dilated_occupancy_grid == 0, self.dilated_occupancy_grid)
 
-        plt.imshow(masked_dilated_grid, cmap='Blues', origin='lower', alpha=1)
+        plt.imshow(masked_dilated_grid, cmap='Blues', origin='lower', alpha=0.5)
 
         plt.title("Binary Occupancy Grid with Dilation")
         plt.xlabel("Width (pixels)")
         plt.ylabel("Height (pixels)")
         plt.colorbar(label='Occupancy')
-        plt.savefig(filename, dpi=dpi)
+        plt.savefig(f"src/{pkg_name}/combined_occupancy_grid.png", dpi=dpi)
         plt.close()
-        self.get_logger().info(f"Binary occupancy grid saved as {filename} with DPI {dpi}")
+
+        self.get_logger().info(f"Occupancy grid visualization saved to src/{pkg_name}/ with DPI {dpi}")
+
+    def apply_shape_masks(self, dilated_grid):
+        """Apply custom shape masks to the dilated occupancy grid."""
+        # Create a copy of the dilated grid
+        masked_grid = dilated_grid.copy()
+        
+        # Example: Add a rectangle
+        # Format: (y_start, y_end, x_start, x_end)
+        rectangle = (100, 800, 150, 800)  # Adjust these values based on your map
+        masked_grid[rectangle[0]:rectangle[1], rectangle[2]:rectangle[3]] = 1
+        
+        # Example: Add a circle
+        # Format: (center_y, center_x, radius)
+        circle = (300, 400, 50)  # Adjust these values based on your map
+        y, x = np.ogrid[:dilated_grid.shape[0], :dilated_grid.shape[1]]
+        dist_from_center = np.sqrt((x - circle[1])**2 + (y - circle[0])**2)
+        mask = dist_from_center <= circle[2]
+        masked_grid[mask] = 1
+        
+        return masked_grid
 
     def state_machine_cb(self):
         self.get_logger().info(f'{self.state=}')
