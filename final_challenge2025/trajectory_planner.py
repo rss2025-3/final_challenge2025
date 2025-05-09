@@ -350,22 +350,42 @@ class PathPlan(Node):
         self.get_logger().info(f"Occupancy grid visualization saved to src/{pkg_name}/ with DPI {dpi}")
 
     def apply_shape_masks(self, dilated_grid):
-        """Apply custom shape masks to the dilated occupancy grid."""
-        # Create a copy of the dilated grid
         masked_grid = dilated_grid.copy()
         
-        # Example: Add a rectangle
-        # Format: (y_start, y_end, x_start, x_end)
-        rectangle = (100, 800, 150, 800)  # Adjust these values based on your map
-        masked_grid[rectangle[0]:rectangle[1], rectangle[2]:rectangle[3]] = 1
+        polygon1_coords = np.array([
+            [851, 821],  # Top left
+            [866, 808],  # Top right 
+            [808, 741],  # Bottom right
+            [790, 763]   # Bottom left
+        ])
         
-        # Example: Add a circle
-        # Format: (center_y, center_x, radius)
-        circle = (300, 400, 50)  # Adjust these values based on your map
-        y, x = np.ogrid[:dilated_grid.shape[0], :dilated_grid.shape[1]]
-        dist_from_center = np.sqrt((x - circle[1])**2 + (y - circle[0])**2)
-        mask = dist_from_center <= circle[2]
-        masked_grid[mask] = 1
+        polygon2_coords = np.array([
+            [844, 450],
+            [871, 450],
+            [871, 410],
+            [844, 410] 
+        ])
+
+        polygon3_coords = np.array([
+            [884, 401],
+            [922, 401],
+            [922, 375],
+            [884, 375]
+        ])
+
+        polygon4_coords = np.array([
+            [1545, 828],  # Top left
+            [1597, 828],  # Top right
+            [1597, 647],  # Bottom right
+            [1545, 647]   # Bottom left
+        ])
+        
+        img = np.zeros(dilated_grid.shape, dtype=np.uint8)
+        cv2.fillPoly(img, [polygon1_coords], 1)
+        cv2.fillPoly(img, [polygon2_coords], 1)
+        cv2.fillPoly(img, [polygon3_coords], 1)
+        cv2.fillPoly(img, [polygon4_coords], 1)
+        masked_grid[img == 1] = 1
         
         return masked_grid
 
