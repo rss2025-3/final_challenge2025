@@ -27,7 +27,7 @@ class DetectorNode(Node):
         
         self.create_subscription(Bool, "/banana_close", self.banana_detected_callback, 10)
         self.banana_close = False
-
+        self.max_area = 0
         self.bridge = CvBridge()
         self.get_logger().info("Detector Initialized")
         self.counter = 0
@@ -36,6 +36,7 @@ class DetectorNode(Node):
         self.banana_close = msg.data
         if msg.data is False:
             self.banana_save_count += 1
+            self.max_area = 0
     def callback(self, img_msg):
 
         self.counter += 1
@@ -62,7 +63,7 @@ class DetectorNode(Node):
         out = model.draw_box(np.array(img), predictions, draw_all=True)
         
         if self.banana_close is True:
-            model.set_threshold(0.01)
+            model.set_threshold(0.05)
             results = model.predict(img)
         
             predictions = results["predictions"]
@@ -70,8 +71,9 @@ class DetectorNode(Node):
             out = model.draw_box(np.array(out), predictions, draw_all=True)
             #self.get_logger().info(f'{predictions=}')
             banana = None
+            predictions = sorted(predictions, key=lambda x: abs((x[0][2] - x[0][0]) * (x[0][1] - x[0][3]))) 
             for p in predictions:
-                if p[1] in ['banana', 'boat', 'kite', 'bird']:
+                if p[1] in ['banana']: #, 'boat', 'kite', 'bird']:
                     banana = p
 
             if banana is not None:
@@ -86,7 +88,7 @@ class DetectorNode(Node):
 
                 #debug_msg = self.bridge.cv2_to_imgmsg(np.array(out), "bgr8")
                 #self.debug_pub.publish(debug_msg)
-            
+                area = abs(x1-x2)*abs(y1-y2) 
                 pixel_msg = ConeLocationPixel()
                 pixel_msg.u = x
                 pixel_msg.v = y
@@ -95,8 +97,9 @@ class DetectorNode(Node):
 
                 self.publisher.publish(pixel_msg)
                 # Save image if it's the 1st or 2nd detection
-                if self.banana_save_count < 2:
-                    filename = f"banana{self.banana_save_count + 1}.jpg"
+                if self.banana_save_count < 3 and area >= self.max_area:
+                    filename = f"banana{self.banana_save_count}.jpg"
+                    self.max_area = area
                     cv2.imwrite(filename, np.array(out))
                     self.get_logger().info(f"Saved banana detection image as {filename}")
             # save_path = "demo_output.png"

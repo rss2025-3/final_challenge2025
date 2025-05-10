@@ -386,13 +386,20 @@ class PathPlan(Node):
             [675, 465],  # Bottom right
             [655, 465]   # Bottom left
         ])
-        
+
+        polygon6_coords = np.array([
+            [935, 320],  # Top left
+            [1050, 320],  # Top right
+            [1050, 298],  # Bottom right
+            [935, 298]   # Bottom left
+        ])        
         img = np.zeros(dilated_grid.shape, dtype=np.uint8)
         cv2.fillPoly(img, [polygon1_coords], 1)
         cv2.fillPoly(img, [polygon2_coords], 1)
         cv2.fillPoly(img, [polygon3_coords], 1)
         cv2.fillPoly(img, [polygon4_coords], 1)
         cv2.fillPoly(img, [polygon5_coords], 1)
+        cv2.fillPoly(img, [polygon6_coords], 1)
         masked_grid[img == 1] = 1
         
         return masked_grid
@@ -400,7 +407,7 @@ class PathPlan(Node):
     def state_machine_cb(self):
         self.get_logger().info(f'{self.state=}')
         if self.goals:
-            self.get_logger().info(f"goals: {self.goals}")
+            #self.get_logger().info(f"goals: {self.goals}")
             if self.state == "START":
                 self.get_logger().info("switch to planning")
                 self.state = "PLANNING"
@@ -414,23 +421,24 @@ class PathPlan(Node):
                 #self.banana_close.publish(Bool(data=False))
                 goal = self.goals[self.goal_index]
                 dist = np.linalg.norm(np.array(goal) - np.array(self.current_position))
-                self.get_logger().info(f"dist: {dist}")
+                #self.get_logger().info(f"dist: {dist}")
                 if self.going_banana3:
-                    start_detecting = 3
+                    start_detecting = 1.0
                 else:
-                    start_detecting = 1.5
+                    start_detecting = 1.0
 
                 if dist < start_detecting: # if we're close to the banana location turn on the camera stuff
                     self.state = "DETECTING"
                     self.start_time = self.get_clock().now()
                     self.get_logger().info("switch to detecting")
+                    self.park_start_time = None
             elif self.state == "DETECTING":
                 if self.parked:
                     #self.banana_close.publish(Bool(data=False))
                     self.banana_close.publish(Bool(data=True))
                     if self.park_start_time is None:
                         self.goal_index += 1
-                        self.get_logger().info(f"{self.goal_index}")
+                        #self.get_logger().info(f"{self.goal_index}")
                         self.park_start_time = self.get_clock().now()
                     
                     time_parked = (self.get_clock().now() - self.park_start_time).nanoseconds / 1e9
@@ -450,7 +458,8 @@ class PathPlan(Node):
                 else:
                     self.banana_close.publish(Bool(data=True))
                 # if self.parked:
-                    '''
+                    self.get_logger().info('PARKING!!!!')
+                    '''i
                     if self.park_start_time is None:
                         self.park_start_time = self.get_clock().now()
                     else:
@@ -475,6 +484,7 @@ class PathPlan(Node):
                     drive_msg.drive.speed = backup_speed
                     drive_msg.drive.steering_angle = 0.0
                     self.drive_pub.publish(drive_msg)
+                    self.get_logger().info('BACKING UPP')
                 else:
                     # Stop the car after backing up
                     stop_msg = AckermannDriveStamped()
@@ -490,9 +500,9 @@ class PathPlan(Node):
                         self.state = "DONE"
                         self.get_logger().info("All goals visited. Returning to start.")
             elif self.state == "DONE":
-                self.state == "FINISHED"
+                self.state = "FINISHED"
                 goal = self.goals[self.goal_index]
-                self.get_logger().info(f"start goal: {goal}")
+                #self.get_logger().info(f"start goal: {goal}")
                 midpoint = (-54.54682159423828, 26.789297103881836)
                 self.plan_path_midpoint(self.current_position, midpoint, goal, self.dilated_occupancy_grid, a_star=True)
                 self.banana_close.publish(Bool(data=False))

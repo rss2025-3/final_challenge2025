@@ -33,7 +33,7 @@ class HeistStoppingController(Node):
         self.STOPPING_TIME = self.get_parameter('stopping_time').get_parameter_value().double_value
         self.ODOM_TOPIC = self.get_parameter('odom_topic').get_parameter_value().string_value
 
-
+        self.get_logger().info(f'{self.STOPPING_TIME=}')
         self.drive_publisher_ = self.create_publisher(AckermannDriveStamped, self.SAFETY_TOPIC, 10)
 
         self.ackermann_sub = self.create_subscription(
@@ -78,7 +78,8 @@ class HeistStoppingController(Node):
         y = msg.pose.pose.position.y
 
         self.stoplight_dist = np.sqrt((x-self.stoplight_loc[0])**2+(y-self.stoplight_loc[1])**2)
-
+        
+        self.get_logger().info(f'{self.stoplight_dist=}')
     def acker_callback(self, msg):
         self.velocity = msg.drive.speed
         
@@ -103,10 +104,17 @@ class HeistStoppingController(Node):
 
         # calculates the forward obstacle distance by averaging 10 LIDAR values in front
         # index 50 is the front middle and so 45:55 is the region around it
-        forward_dist = min(scan_data[470:600]) # TODO: check the dimensions of actual LIDAR scan
+        if self.stoplight_dist < 5:
+            forward_dist = min(scan_data[470:600]) # TODO: check the dimensions of actual LIDAR scan
+            buffer = 0.4
+            dist = 0.2
+        else:
+            forward_dist = min(scan_data[530:550])
+            buffer = -0.1
+            dist = 0.1
         time_to_collision = forward_dist / (self.velocity+0.01)
-        stop = time_to_collision < (self.STOPPING_TIME+0.4) or forward_dist < 0.2
-        stop = stop and (not self.banana_close)
+        stop = time_to_collision < (self.STOPPING_TIME+buffer) or forward_dist < dist
+        stop = stop and (not self.banana_close) and (self.stoplight_dist < 9)
         
         if self.should_stop_at_red or (stop and self.velocity >= 0): # TODO: if this doesn't work maybe we also check distance
             # Do something to stop

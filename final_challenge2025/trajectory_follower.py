@@ -59,7 +59,7 @@ class PurePursuit(Node):
         
     def pose_callback(self, odometry_msg):
         if self.initialized_traj is True and self.banana_close is False:
-            self.get_logger().info('PURE PURSUITTTTTT!!!')
+            #self.get_logger().info('PURE PURSUITTTTTT!!!')
             map_x = odometry_msg.pose.pose.position.x
             map_y = odometry_msg.pose.pose.position.y
             theta = tf.euler_from_quaternion((odometry_msg.pose.pose.orientation.x, odometry_msg.pose.pose.orientation.y, odometry_msg.pose.pose.orientation.z, odometry_msg.pose.pose.orientation.w))[2]
@@ -100,7 +100,7 @@ class PurePursuit(Node):
                 # backwards hack
                 dist_to_stoplight = math.sqrt((map_x-self.stoplight_loc[0])**2 + (map_y-self.stoplight_loc[1])**2)
                 if self.num_traj == 3:
-                    drive_cmd.drive.speed = 2 * self.speed
+                    drive_cmd.drive.speed = 1.5 * self.speed
                 elif dist_to_stoplight > 3:
                     drive_cmd.drive.speed = 1 * self.speed
                 else:
